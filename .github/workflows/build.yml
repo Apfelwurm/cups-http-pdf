@@ -17,10 +17,8 @@ jobs:
           set -e
           current="$(grep -m1 '^cups-http-pdf (' debian/changelog | sed -E 's/cups-http-pdf \(([^)]+)\).*/\1/')"
           echo "Current version: $current"
-          # Use date+shortsha scheme auto-increment
-            newver="$(date +%Y.%m.%d).${GITHUB_SHA::7}"
+          newver="$(date +%Y.%m.%d).${GITHUB_SHA::7}"
           dch --newversion "$newver" --distribution unstable --urgency medium "Automated build." || true
-          # Ensure maintainer line
           if ! tail -n1 debian/changelog | grep -q '^ -- '; then
             echo " -- GitHub Actions <actions@users.noreply.github.com>  $(date -R)" >> debian/changelog
           fi
@@ -29,20 +27,20 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y devscripts debhelper curl
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            devscripts \
+            debhelper \
+            fakeroot \
+            curl \
+            python3
 
       - name: Build package
         run: |
           debuild -us -uc
 
-      - name: Gather artifacts
-        run: |
-          mkdir dist
-          mv ../cups-http-pdf_*.deb dist/
-          mv ../cups-http-pdf_*.build dist/ || true
-          mv ../cups-http-pdf_*.changes dist/ || true
-          mv ../cups-http-pdf_*.dsc dist/ || true
-          mv ../cups-http-pdf_*.tar.* dist/ || true
+      - name: List artifacts
+        run: ls -l dist || (echo 'dist missing' && exit 1)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
