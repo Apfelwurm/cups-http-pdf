@@ -4,25 +4,32 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Bump version
+      - name: Extract package version
         id: version
         run: |
           set -e
-          current="$(grep -m1 '^cups-http-pdf (' debian/changelog | sed -E 's/cups-http-pdf \(([^)]+)\).*/\1/')"
-          echo "Current version: $current"
-          newver="$(date +%Y.%m.%d).${GITHUB_SHA::7}"
-          dch --newversion "$newver" --distribution unstable --urgency medium "Automated build." || true
-          if ! tail -n1 debian/changelog | grep -q '^ -- '; then
-            echo " -- GitHub Actions <actions@users.noreply.github.com>  $(date -R)" >> debian/changelog
+          pkgver="$(dpkg-parsechangelog -S Version)"
+          echo "Package version: $pkgver"
+          echo "version=$pkgver" >> $GITHUB_OUTPUT
+          # Detect existing tag
+          if git rev-parse -q --verify "refs/tags/v$pkgver" >/dev/null; then
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+            echo "Tag v$pkgver already exists; release will be skipped.";
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
           fi
-          echo "version=$newver" >> $GITHUB_OUTPUT
 
       - name: Install build deps
         run: |
@@ -49,6 +56,7 @@ jobs:
           path: dist
 
       - name: Create Release
+        if: steps.version.outputs.tag_exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
@@ -56,3 +64,7 @@ jobs:
           files: dist/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip Release (tag exists)
+        if: steps.version.outputs.tag_exists == 'true'
+        run: echo "Release already exists for version ${{ steps.version.outputs.version }}; skipping."
