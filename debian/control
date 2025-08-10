@@ -1,0 +1,16 @@
+Source: cups-http-pdf
+Section: utils
+Priority: optional
+Maintainer: Apfelwurm <Alexander@volzit.de>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/Apfelwurm/cups-http-pdf
+
+Package: cups-http-pdf
+Architecture: all
+Depends: ${misc:Depends}, python3, curl, cups
+Description: CUPS backend to POST PDF print jobs to an HTTP endpoint
+ A simple CUPS backend that forwards rendered PDF print jobs to an HTTP(S)
+ endpoint using curl. Provide device URIs of the form http-pdf://host:port/path
+ or http-pdf+ssl://host:port/path.

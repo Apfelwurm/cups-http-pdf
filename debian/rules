@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+
+export DH_OPTIONS
+
+# Use an internal dist directory for build outputs
+BUILD_DIR := $(CURDIR)/dist
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
+
+%:
+	dh $@
+
+override_dh_clean:
+	dh_clean
+	rm -rf dist
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/cups-http-pdf/
+
+# After package build, copy resulting artifacts from parent (default) into dist
+# using a post-build hook
+override_dh_builddeb:
+	dh_builddeb
+	mkdir -p dist
+	cp -t dist ../cups-http-pdf_* 2>/dev/null || true

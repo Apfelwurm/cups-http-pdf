@@ -1,0 +1,18 @@
+# Build artifacts
+*.deb
+*.build
+*.changes
+*.dsc
+*.tar.*
+*.buildinfo
+
+# Debian source/build dirs if created
+/debian/.debhelper/
+/debian/cups-http-pdf/
+/debian/files
+/debian/debhelper-build-stamp
+/debian/*.substvars
+
+# Local build output
+/dist/
+debian/cups-http-pdf.debhelper.log

@@ -1,0 +1,60 @@
+name: Build and Release Debian Package
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bump version
+        id: version
+        run: |
+          set -e
+          current="$(grep -m1 '^cups-http-pdf (' debian/changelog | sed -E 's/cups-http-pdf \(([^)]+)\).*/\1/')"
+          echo "Current version: $current"
+          # Use date+shortsha scheme auto-increment
+            newver="$(date +%Y.%m.%d).${GITHUB_SHA::7}"
+          dch --newversion "$newver" --distribution unstable --urgency medium "Automated build." || true
+          # Ensure maintainer line
+          if ! tail -n1 debian/changelog | grep -q '^ -- '; then
+            echo " -- GitHub Actions <actions@users.noreply.github.com>  $(date -R)" >> debian/changelog
+          fi
+          echo "version=$newver" >> $GITHUB_OUTPUT
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts debhelper curl
+
+      - name: Build package
+        run: |
+          debuild -us -uc
+
+      - name: Gather artifacts
+        run: |
+          mkdir dist
+          mv ../cups-http-pdf_*.deb dist/
+          mv ../cups-http-pdf_*.build dist/ || true
+          mv ../cups-http-pdf_*.changes dist/ || true
+          mv ../cups-http-pdf_*.dsc dist/ || true
+          mv ../cups-http-pdf_*.tar.* dist/ || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: cups-http-pdf ${{ steps.version.outputs.version }}
+          files: dist/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

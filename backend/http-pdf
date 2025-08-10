@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+# CUPS backend to POST rendered PDF to an HTTP endpoint.
+# URI format: http-pdf://host:port/print?printer=HP%20LaserJet
+# Environment: CUPS provides DEVICE_URI. Arguments per backend spec:
+#   argv[1]=job-id argv[2]=user argv[3]=title argv[4]=copies argv[5]=options argv[6]=[file]
+import os, sys, shlex, subprocess, tempfile, urllib.parse
+
+def discover():
+    # Minimal discovery output so it shows up as a "network" device
+    # Format: class scheme "make-and-model" "comment" "device-info" [device-id] [options]
+    print('network http-pdf "HTTP PDF Forwarder" "Posts PDF to an HTTP endpoint"')
+    return 0
+
+def main():
+    if len(sys.argv) == 1:
+        return discover()
+
+    if len(sys.argv) < 6:
+        print("ERROR: Not enough arguments for CUPS backend.", file=sys.stderr)
+        return 1
+
+    job_id   = sys.argv[1]
+    user     = sys.argv[2]
+    title    = sys.argv[3]
+    copies   = sys.argv[4]
+    options  = sys.argv[5]
+    in_file  = sys.argv[6] if len(sys.argv) > 6 else None
+
+    device_uri = os.environ.get("DEVICE_URI", "")
+    if not device_uri.startswith("http-pdf://") and not device_uri.startswith("http-pdf+ssl://"):
+        print("ERROR: DEVICE_URI must start with http-pdf:// or http-pdf+ssl://", file=sys.stderr)
+        return 1
+
+    # Translate our scheme to a normal http/https URL
+    if device_uri.startswith("http-pdf+ssl://"):
+        url = "https://" + device_uri[len("http-pdf+ssl://"):]
+    else:
+        url = "http://" + device_uri[len("http-pdf://"):]
+
+    temp_path = None
+    try:
+        if not in_file or in_file == "-" or not os.path.exists(in_file):
+            fd, temp_path = tempfile.mkstemp(prefix="cupspdf_", suffix=".pdf")
+            os.close(fd)
+            with open(temp_path, "wb") as f:
+                f.write(sys.stdin.buffer.read())
+            pdf_path = temp_path
+        else:
+            pdf_path = in_file
+
+        cmd = [
+            "curl", "--fail", "-sS", "-X", "POST",
+            "-H", "Content-Type: application/pdf",
+            "--data-binary", f"@{pdf_path}",
+            url
+        ]
+
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.returncode != 0:
+            print(f"ERROR: curl failed: {proc.stderr.strip()}", file=sys.stderr)
+            return 1
+
+        return 0
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try: os.remove(temp_path)
+            except: pass
+
+if __name__ == "__main__":
+    sys.exit(main())
