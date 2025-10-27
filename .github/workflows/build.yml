@@ -50,7 +50,7 @@ jobs:
         run: ls -l dist || (echo 'dist missing' && exit 1)
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: debian-package
           path: dist
